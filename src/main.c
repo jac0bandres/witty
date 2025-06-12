@@ -4,8 +4,12 @@
 #include <sys/wait.h>
 #include "pty.h"
 #include "term.h"
+#include "screen.h"
+#include "render.h"
+#include "log.h"
 
 int main() {
+    log_init("witty.log");
     pid_t child; 
     int pty_fd = spawn_shell(&child);
     if (pty_fd < 0) {
@@ -14,16 +18,26 @@ int main() {
     }
     printf("Spawned shell with PID %d, PTY FD %d\n", child, pty_fd);
 
+    int rowSize = 20;
+    int colSize = 84;
+    int *rows = &rowSize;
+    int *cols = &colSize;
+    log_info("Initializing renderer with rows: %d, cols: %d", *rows, *cols);
+    init_renderer(rows, cols);
+    printf("window size: %d, %d", *rows, *cols);
+    Screen *screen = init_screen(*rows, *cols);
+    enable_raw_mode();
+
     char buf[1024];
     ssize_t n;
 
     fd_set fds;
     while (1) {
-        FD_ZERO(&fds);
-        FD_SET(STDIN_FILENO, &fds);
+        FD_ZERO(&fds); FD_SET(STDIN_FILENO, &fds);
         FD_SET(pty_fd, &fds);
 
         int max_fd = (STDIN_FILENO > pty_fd ? STDIN_FILENO : pty_fd) + 1;
+
          if(select(max_fd, &fds, NULL, NULL, NULL) < 0) {
             perror("select");
             break;
@@ -44,10 +58,15 @@ int main() {
                 perror("read from pty");
                 break;
             }
-            write(STDOUT_FILENO, buf, n);
+            for (ssize_t i = 0; i < n; i++) {
+                put_char_at_cursor(buf[i], screen);
+            }
+            render_screen(screen);
         }
     }
 
+    destroy_screen(screen);
+    destroy_renderer();
     restore_terminal();
 
     int status;

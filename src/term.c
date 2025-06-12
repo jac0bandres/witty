@@ -25,7 +25,7 @@ void enable_raw_mode() {
     raw.c_lflag &= ~(IXON | ICRNL);
     raw.c_iflag &= ~(OPOST);
 
-    if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1) {
+    if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1)  {
         perror("tcsetattr");
         exit(EXIT_FAILURE);
     }
